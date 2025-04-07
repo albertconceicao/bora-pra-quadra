@@ -10,6 +10,7 @@ type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'H
 export default function HomeScreen() {
   const navigation = useNavigation<HomeScreenNavigationProp>();
   const currentUser = getCurrentUser();
+  const hasCreatedCourts = currentUser?.createdCourts?.length > 0;
 
   const handleSignOut = async () => {
     await signOut();
@@ -26,17 +27,26 @@ export default function HomeScreen() {
       <View style={styles.buttonContainer}>
         <TouchableOpacity
           style={styles.button}
-          onPress={() => navigation.navigate('Courts')}
+          onPress={() => navigation.navigate('Courts', { userOnly: true })}
         >
           <Text style={styles.buttonText}>Gerenciar Quadras</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.button}
-          onPress={() => navigation.navigate('SearchCourts')}
+          onPress={() => navigation.navigate('SearchCourts', { userOnly: false })}
         >
           <Text style={styles.buttonText}>Buscar Quadras</Text>
         </TouchableOpacity>
+
+        {hasCreatedCourts && (
+          <TouchableOpacity
+            style={styles.button}
+            onPress={() => navigation.navigate('Affiliations')}
+          >
+            <Text style={styles.buttonText}>Gerenciar Afiliações</Text>
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity
           style={[styles.button, styles.signOutButton]}

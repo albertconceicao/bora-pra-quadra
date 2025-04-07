@@ -1,11 +1,22 @@
+import { RouteProp, useRoute } from '@react-navigation/native';
 import React, { useState } from 'react';
-import { FlatList, Image, Linking, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Image, Linking, Modal, ScrollView, SectionList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Court } from '../database/courts';
 import { getCurrentUser } from '../database/users';
 import { useCourts } from '../hooks/useCourts';
+import { RootStackParamList } from '../types/navigation';
+
+interface Section {
+  title: string;
+  data: Court[];
+}
+
+type CourtsScreenRouteProp = RouteProp<RootStackParamList, 'Courts'>;
 
 export const CourtsScreen = () => {
-  const { courts, loading, createCourt, modifyCourt, removeCourt } = useCourts({ userOnly: true });
+  const route = useRoute<CourtsScreenRouteProp>();
+  const userOnly = route.params?.userOnly ?? false;
+  const { courts, loading, createCourt, modifyCourt, removeCourt } = useCourts({ userOnly });
   const [modalVisible, setModalVisible] = useState(false);
   const [editingCourt, setEditingCourt] = useState<Court | null>(null);
   const [formData, setFormData] = useState({
@@ -24,6 +35,49 @@ export const CourtsScreen = () => {
     startTime: '',
     endTime: '',
   });
+
+  const currentUser = getCurrentUser();
+
+  // Organize courts into sections
+  const organizeCourts = () => {
+    if (!currentUser) return [];
+
+    const ownedCourts = courts.filter(court => 
+      currentUser.createdCourts.includes(court.id)
+    );
+    
+    const affiliatedCourts = courts.filter(court => 
+      !currentUser.createdCourts.includes(court.id) && 
+      currentUser.affiliatedCourts.includes(court.id)
+    );
+    
+    const otherCourts = courts.filter(court => 
+      !currentUser.createdCourts.includes(court.id) && 
+      !currentUser.affiliatedCourts.includes(court.id)
+    );
+
+    const sections = [];
+    
+    if (userOnly) {
+      if (ownedCourts.length > 0) {
+        sections.push({ title: 'Minhas Quadras', data: ownedCourts });
+      }
+    } else {
+      if (ownedCourts.length > 0) {
+        sections.push({ title: 'Minhas Quadras', data: ownedCourts });
+      }
+      if (affiliatedCourts.length > 0) {
+        sections.push({ title: 'Quadras Afiliadas', data: affiliatedCourts });
+      }
+      if (otherCourts.length > 0) {
+        sections.push({ title: 'Outras Quadras', data: otherCourts });
+      }
+    }
+
+    return sections;
+  };
+
+  const sections = organizeCourts();
 
   const handleSubmit = () => {
     const courtData = {
@@ -155,6 +209,12 @@ export const CourtsScreen = () => {
     </View>
   );
 
+  const renderSectionHeader = ({ section }: { section: Section }) => (
+    <View style={styles.sectionHeader}>
+      <Text style={styles.sectionTitle}>{section.title}</Text>
+    </View>
+  );
+
   if (loading) {
     return (
       <View style={styles.container}>
@@ -163,35 +223,44 @@ export const CourtsScreen = () => {
     );
   }
 
-  const currentUser = getCurrentUser();
   if (!currentUser) {
     return (
       <View style={styles.container}>
-        <Text style={styles.errorText}>Please sign in to manage courts.</Text>
+        <Text style={styles.message}>Please sign in to view courts.</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity
-        style={styles.addButton}
-        onPress={() => setModalVisible(true)}
-      >
-        <Text style={styles.addButtonText}>Add New Court</Text>
-      </TouchableOpacity>
+      {userOnly && (
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={() => setModalVisible(true)}
+        >
+          <Text style={styles.addButtonText}>Adicionar nova quadra</Text>
+        </TouchableOpacity>
+      )}
 
-      {courts.length === 0 ? (
+      {sections.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>You haven't added any courts yet.</Text>
-          <Text style={styles.emptySubText}>Tap the button above to add your first court!</Text>
+          <Text style={styles.emptyText}>
+            {userOnly ? "Você ainda não adicionou nenhuma quadra." : "Nenhuma quadra disponível."}
+          </Text>
+          {userOnly && (
+            <Text style={styles.emptySubText}>
+              Clique no botão acima para adicionar sua primeira quadra!
+            </Text>
+          )}
         </View>
       ) : (
-        <FlatList
-          data={courts}
-          renderItem={renderItem}
+        <SectionList
+          sections={sections}
+          renderItem={({ item }) => renderItem({ item })}
+          renderSectionHeader={renderSectionHeader}
           keyExtractor={(item) => item.id}
           style={styles.list}
+          stickySectionHeadersEnabled={true}
         />
       )}
 
@@ -205,47 +274,47 @@ export const CourtsScreen = () => {
           <View style={styles.modalContent}>
             <ScrollView showsVerticalScrollIndicator={false}>
               <Text style={styles.modalTitle}>
-                {editingCourt ? 'Edit Court' : 'Add New Court'}
+                {editingCourt ? 'Editar quadra' : 'Adicionar nova quadra'}
               </Text>
               
               <TextInput
                 style={styles.input}
-                placeholder="Court Name"
+                placeholder="Nome da quadra"
                 value={formData.name}
                 onChangeText={(text) => setFormData({ ...formData, name: text })}
               />
               
               <TextInput
                 style={styles.input}
-                placeholder="Location"
+                placeholder="Localização"
                 value={formData.location}
                 onChangeText={(text) => setFormData({ ...formData, location: text })}
               />
 
               <TextInput
                 style={styles.input}
-                placeholder="Address"
+                placeholder="Endereço"
                 value={formData.address}
                 onChangeText={(text) => setFormData({ ...formData, address: text })}
               />
 
               <TextInput
                 style={styles.input}
-                placeholder="City"
+                placeholder="Cidade"
                 value={formData.city}
                 onChangeText={(text) => setFormData({ ...formData, city: text })}
               />
 
               <TextInput
                 style={styles.input}
-                placeholder="Neighborhood"
+                placeholder="Bairro"
                 value={formData.neighborhood}
                 onChangeText={(text) => setFormData({ ...formData, neighborhood: text })}
               />
 
               <TextInput
                 style={styles.input}
-                placeholder="WhatsApp Number"
+                placeholder="Número de WhatsApp"
                 value={formData.whatsApp}
                 onChangeText={(text) => setFormData({ ...formData, whatsApp: text })}
                 keyboardType="phone-pad"
@@ -253,21 +322,21 @@ export const CourtsScreen = () => {
 
               <TextInput
                 style={styles.input}
-                placeholder="Photo URL"
+                placeholder="URL da foto"
                 value={formData.photo}
                 onChangeText={(text) => setFormData({ ...formData, photo: text })}
               />
 
               <TextInput
                 style={styles.input}
-                placeholder="Responsible Person"
+                placeholder="Responsável"
                 value={formData.responsible}
                 onChangeText={(text) => setFormData({ ...formData, responsible: text })}
               />
               
               <TextInput
                 style={styles.input}
-                placeholder="Surface Type"
+                placeholder="Tipo de superfície"
                 value={formData.surface}
                 onChangeText={(text) => setFormData({ ...formData, surface: text })}
               />
@@ -275,7 +344,7 @@ export const CourtsScreen = () => {
               <View style={styles.dimensionsContainer}>
                 <TextInput
                   style={[styles.input, styles.dimensionInput]}
-                  placeholder="Width (m)"
+                  placeholder="Largura (m)"
                   value={formData.width}
                   onChangeText={(text) => setFormData({ ...formData, width: text })}
                   keyboardType="numeric"
@@ -283,7 +352,7 @@ export const CourtsScreen = () => {
                 
                 <TextInput
                   style={[styles.input, styles.dimensionInput]}
-                  placeholder="Length (m)"
+                  placeholder="Comprimento (m)"
                   value={formData.length}
                   onChangeText={(text) => setFormData({ ...formData, length: text })}
                   keyboardType="numeric"
@@ -292,7 +361,7 @@ export const CourtsScreen = () => {
 
               <TextInput
                 style={styles.input}
-                placeholder="Day of Week"
+                placeholder="Dia da semana"
                 value={formData.dayOfWeek}
                 onChangeText={(text) => setFormData({ ...formData, dayOfWeek: text })}
               />
@@ -300,14 +369,14 @@ export const CourtsScreen = () => {
               <View style={styles.dimensionsContainer}>
                 <TextInput
                   style={[styles.input, styles.dimensionInput]}
-                  placeholder="Start Time"
+                  placeholder="Hora de início"
                   value={formData.startTime}
                   onChangeText={(text) => setFormData({ ...formData, startTime: text })}
                 />
                 
                 <TextInput
                   style={[styles.input, styles.dimensionInput]}
-                  placeholder="End Time"
+                  placeholder="Hora de término"
                   value={formData.endTime}
                   onChangeText={(text) => setFormData({ ...formData, endTime: text })}
                 />
@@ -321,7 +390,7 @@ export const CourtsScreen = () => {
                     setEditingCourt(null);
                   }}
                 >
-                  <Text style={styles.buttonText}>Cancel</Text>
+                  <Text style={styles.buttonText}>Cancelar</Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity
@@ -329,7 +398,7 @@ export const CourtsScreen = () => {
                   onPress={handleSubmit}
                 >
                   <Text style={styles.buttonText}>
-                    {editingCourt ? 'Save Changes' : 'Add Court'}
+                    {editingCourt ? 'Salvar alterações' : 'Adicionar quadra'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -499,5 +568,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#999',
     textAlign: 'center',
+  },
+  sectionHeader: {
+    backgroundColor: '#f8f8f8',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  message: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 20,
   },
 }); 

@@ -5,6 +5,8 @@ export interface User {
   name: string;
   favoriteCourts: string[]; // Array of court IDs
   createdCourts: string[]; // Array of court IDs created by this user
+  affiliatedCourts: string[]; // Courts the user is affiliated with
+  pendingAffiliations: string[]; // Courts where affiliation is pending
 }
 
 // In-memory storage
@@ -30,6 +32,8 @@ export const signUp = async (email: string, password: string, name: string): Pro
     name,
     favoriteCourts: [],
     createdCourts: [],
+    affiliatedCourts: [],
+    pendingAffiliations: [],
   };
 
   users.push(newUser);
@@ -107,4 +111,119 @@ export const addCreatedCourt = (courtId: string): void => {
 export const canEditCourt = (courtId: string): boolean => {
   if (!currentUser) return false;
   return currentUser.createdCourts.includes(courtId);
+};
+
+// Request court affiliation
+export const requestAffiliation = async (courtId: string): Promise<{ success: boolean; message: string }> => {
+  if (!currentUser) {
+    return { success: false, message: 'User not authenticated' };
+  }
+
+  if (currentUser.affiliatedCourts.includes(courtId)) {
+    return { success: false, message: 'Already affiliated with this court' };
+  }
+
+  if (currentUser.pendingAffiliations.includes(courtId)) {
+    return { success: false, message: 'Affiliation request already pending' };
+  }
+
+  const userIndex = users.findIndex(u => u.id === currentUser!.id);
+  users[userIndex].pendingAffiliations.push(courtId);
+  currentUser = users[userIndex];
+  
+  return { success: true, message: 'Affiliation request sent' };
+};
+
+// Approve affiliation (court creator only)
+export const approveAffiliation = async (courtId: string, userId: string): Promise<{ success: boolean; message: string }> => {
+  if (!currentUser) {
+    return { success: false, message: 'User not authenticated' };
+  }
+
+  if (!canEditCourt(courtId)) {
+    return { success: false, message: 'Only court creator can approve affiliations' };
+  }
+
+  const targetUser = users.find(u => u.id === userId);
+  if (!targetUser) {
+    return { success: false, message: 'User not found' };
+  }
+
+  if (!targetUser.pendingAffiliations.includes(courtId)) {
+    return { success: false, message: 'No pending affiliation request' };
+  }
+
+  const userIndex = users.findIndex(u => u.id === userId);
+  users[userIndex].pendingAffiliations = users[userIndex].pendingAffiliations.filter(id => id !== courtId);
+  users[userIndex].affiliatedCourts.push(courtId);
+
+  return { success: true, message: 'Affiliation approved' };
+};
+
+// Get pending affiliations for a court
+export const getPendingAffiliations = (courtId: string): User[] => {
+  if (!canEditCourt(courtId)) return [];
+  return users.filter(user => user.pendingAffiliations.includes(courtId));
+};
+
+// Check if user is affiliated with a court
+export const isAffiliatedWithCourt = (courtId: string): boolean => {
+  if (!currentUser) return false;
+  return currentUser.affiliatedCourts.includes(courtId);
+};
+
+// Check if user has pending affiliation
+export const hasPendingAffiliation = (courtId: string): boolean => {
+  if (!currentUser) return false;
+  return currentUser.pendingAffiliations.includes(courtId);
+};
+
+// Add court to user's affiliated courts
+export const addToAffiliatedCourts = (courtId: string, userId: string): void => {
+  const userIndex = users.findIndex(u => u.id === userId);
+  if (userIndex !== -1 && !users[userIndex].affiliatedCourts.includes(courtId)) {
+    users[userIndex].affiliatedCourts.push(courtId);
+  }
+};
+
+// Deny affiliation (court creator only)
+export const denyAffiliation = async (courtId: string, userId: string): Promise<{ success: boolean; message: string }> => {
+  if (!currentUser) {
+    return { success: false, message: 'User not authenticated' };
+  }
+
+  if (!canEditCourt(courtId)) {
+    return { success: false, message: 'Only court creator can deny affiliations' };
+  }
+
+  const targetUser = users.find(u => u.id === userId);
+  if (!targetUser) {
+    return { success: false, message: 'User not found' };
+  }
+
+  if (!targetUser.pendingAffiliations.includes(courtId)) {
+    return { success: false, message: 'No pending affiliation request' };
+  }
+
+  const userIndex = users.findIndex(u => u.id === userId);
+  users[userIndex].pendingAffiliations = users[userIndex].pendingAffiliations.filter(id => id !== courtId);
+
+  return { success: true, message: 'Affiliation denied' };
+};
+
+// Get user's affiliated courts
+export const getAffiliatedCourts = (): string[] => {
+  return currentUser?.affiliatedCourts || [];
+};
+
+// Get all affiliated users for a court
+export const getAffiliatedUsers = (courtId: string): User[] => {
+  return users.filter(user => user.affiliatedCourts.includes(courtId));
+};
+
+// Get all affiliated users for a court (both pending and approved)
+export const getAllCourtUsers = (courtId: string): { pending: User[]; affiliated: User[] } => {
+  const pending = users.filter(user => user.pendingAffiliations.includes(courtId));
+  const affiliated = users.filter(user => user.affiliatedCourts.includes(courtId));
+  return { pending, affiliated };
 }; 

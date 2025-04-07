@@ -5,6 +5,7 @@ import { getCurrentUser } from '../database/users';
 import { RootStackParamList } from '../types/navigation';
 
 // Import screens
+import { AffiliationsScreen } from '../screens/AffiliationsScreen';
 import CourtDetailsScreen from '../screens/CourtDetailsScreen';
 import { CourtsScreen } from '../screens/CourtsScreen';
 import HomeScreen from '../screens/HomeScreen';
@@ -93,6 +94,11 @@ export default function RootNavigator() {
             title: 'Detalhes da Quadra',
             headerShown: isAuthenticated 
           }}
+        />
+        <Stack.Screen 
+          name="Affiliations" 
+          component={AffiliationsScreen}
+          options={{ title: 'Manage Affiliations' }}
         />
       </Stack.Navigator>
     </NavigationContainer>

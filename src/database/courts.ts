@@ -1,3 +1,5 @@
+import { addCreatedCourt, addToAffiliatedCourts, User } from './users';
+
 // Court type definition
 export interface Court {
   id: string;
@@ -39,7 +41,25 @@ export const addCourt = (courtData: Omit<Court, 'id' | 'creatorId'>, creatorId: 
     creatorId,
   };
   courts.push(newCourt);
+  
+  // Add the court to the user's created courts and automatically affiliate them
+  if (creatorId) {
+    addCreatedCourt(newCourt.id);
+    // Auto-affiliate the creator
+    addToAffiliatedCourts(newCourt.id, creatorId);
+  }
+  
   return newCourt;
+};
+
+// Auto-affiliate creator with their court
+const autoAffiliateCreator = (courtId: string, creatorId: string) => {
+  import('./users').then(({ users }) => {
+    const userIndex = users.findIndex((u: User) => u.id === creatorId);
+    if (userIndex !== -1) {
+      users[userIndex].affiliatedCourts.push(courtId);
+    }
+  });
 };
 
 // Get all courts

@@ -19,11 +19,15 @@ export default function SignInScreen() {
     }
 
     try {
-      await signIn(email, password);
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Home' }],
-      });
+      const result = await signIn(email, password);
+      if (result.success) {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Home' }],
+        });
+      } else {
+        Alert.alert('Error', result.message);
+      }
     } catch (error) {
       Alert.alert('Erro', 'Email ou senha inválidos');
     }
